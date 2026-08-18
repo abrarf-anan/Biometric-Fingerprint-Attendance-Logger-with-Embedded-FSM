@@ -10,19 +10,19 @@ A biometric attendance system built on the ATmega328P (Arduino Uno R3) microcont
 * **Preemptive RTOS Multitasking**: Decomposes firmware execution into three distinct FreeRTOS tasks (polling, state management, and display update) to eliminate super-loop latency.
 * **Safe Inter-Task Communication**: Transmits matched user IDs from the scanning task to the FSM task via a FreeRTOS thread-safe queue (`eventQueue`).
 * **Real-Time Timestamping**: Interfaces with an I²C RTC (DS3231 / DS3338U-33) to attach precise date and time records to attendance logs.
-* **Serial CSV Logging**: Streams structured attendance entries (`ID, Name, Date, Day, Time, Status`) over hardware UART for PC/Excel data collection[cite: 2, 3].
-* **Dual Simulation Validation**: Verified via Proteus EDA for circuit connectivity and SystemC 2.3.3 for cycle-accurate FSM and RTOS scheduler modeling[cite: 2, 3].
+* **Serial CSV Logging**: Streams structured attendance entries (`ID, Name, Date, Day, Time, Status`) over hardware UART for PC/Excel data collection.
+* **Dual Simulation Validation**: Verified via Proteus EDA for circuit connectivity and SystemC 2.3.3 for cycle-accurate FSM and RTOS scheduler modeling.
 
 ---
 
 ## Hardware Architecture & Pin Mapping
 
-The system uses a 7805 voltage regulator with 1 µF input/output decoupling capacitors to supply a stable +5 V rail from a 12 V source[cite: 2, 3].
+The system uses a 7805 voltage regulator with 1 µF input/output decoupling capacitors to supply a stable +5 V rail from a 12 V source.
 
 | Component | Interface / Pins | Details |
 | :--- | :--- | :--- |
 | **Arduino Uno R3** | ATmega328P Main MCU | Controls peripheral interfacing, FSM logic, and FreeRTOS kernel. |
-| **R307 Fingerprint Sensor** | Hardware UART (Pins 0/1) or SoftwareSerial (Pins 2/3) @ 57600 bps | Captures fingerprint images and matches minutiae templates[cite: 2, 3]. |
+| **R307 Fingerprint Sensor** | Hardware UART (Pins 0/1) or SoftwareSerial (Pins 2/3) @ 57600 bps | Captures fingerprint images and matches minutiae templates |
 | **DS3231 / DS3338U-33 RTC** | I²C Bus (SDA -> A4, SCL -> A5) @ Address `0x68` | Stores calendar and clock registers with battery backup |
 | **16×2 Character LCD** | 4-bit Parallel (D3–D7, D11–D13) or I²C (`0x27`) | Displays user check-in status and live RTC time feedback |
 | **Power Regulation** | 12V DC Input -> 7805 Regulator | Provides clean +5V supply filtered by capacitors C1 and C2. |
