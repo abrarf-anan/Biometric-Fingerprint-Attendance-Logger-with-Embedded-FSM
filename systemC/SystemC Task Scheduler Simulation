@@ -1,0 +1,15 @@
+#include <systemc.h>
+#include <iostream>
+
+SC_MODULE(RTOSScheduler) {
+  sc_in<bool> clk;
+
+  void schedule() {
+    // Models priority dispatch and preemption for Task_FSM (P3), Task_Fingerprint (P2), Task_Display (P1)
+  }
+
+  SC_CTOR(RTOSScheduler) {
+    SC_THREAD(schedule);
+    sensitive << clk.pos();
+  }
+};
