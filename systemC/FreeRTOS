@@ -1,0 +1,146 @@
+#include <Arduino_FreeRTOS.h>
+#include <queue.h>
+#include <Wire.h>
+#include <LiquidCrystal_I2C.h>
+#include <RTClib.h>
+#include <Adafruit_Fingerprint.h>
+#include <SoftwareSerial.h>
+ 
+LiquidCrystal_I2C lcd(0x27, 16, 2);
+RTC_DS3231 rtc;
+SoftwareSerial mySerial(2, 3);
+Adafruit_Fingerprint finger = Adafruit_Fingerprint(&mySerial);
+ 
+// ── FSM State Definition 
+typedef enum {
+    STATE_IDLE,
+    STATE_PROCESS
+} SystemState;
+volatile SystemState currentState = STATE_IDLE;
+ 
+// ── User Database (10 registered users) 
+typedef struct {
+    uint16_t    id;
+    const char* name;
+    bool        status;   // false = OUT, true = IN
+} UserRecord;
+ 
+UserRecord users[10] = {
+    {2008001, "FAHIM",    false},
+    {2008002, "FAHAD",    false},
+    {2008003, "NISHAT",   false},
+    {2008004, "RIAD",     false},
+    {2008005, "HEMU",     false},
+    {2008006, "SAJJAD",   false},
+    {2008007, "ARAFAT",   false},
+    {2008008, "ANAN",     false},
+    {2008009, "SAKHAWAT", false},
+    {2008010, "GALIB",    false}
+};
+ 
+// ── Shared State
+QueueHandle_t  eventQueue;
+bool           showUser    = false;
+uint16_t       lastID      = 0;
+unsigned long  displayTimer = 0;
+ 
+// ── Task prototypes 
+void Task_Fingerprint(void *pvParameters);
+void Task_Display    (void *pvParameters);
+void Task_FSM        (void *pvParameters);
+int  getFingerprintID();
+ 
+// ── Setup
+void setup() {
+    Serial.begin(9600);
+    Wire.begin();
+    lcd.init();
+    lcd.backlight();
+    rtc.begin();
+    finger.begin(57600);
+ 
+    eventQueue = xQueueCreate(5, sizeof(uint16_t));
+ 
+    xTaskCreate(Task_Fingerprint, "FP",  128, NULL, 2, NULL);
+    xTaskCreate(Task_Display,     "LCD", 128, NULL, 1, NULL);
+    xTaskCreate(Task_FSM,         "FSM", 128, NULL, 3, NULL);
+ 
+    vTaskStartScheduler();   // Never returns
+}
+void loop() {}
+ 
+// ── Task_Fingerprint (Priority 2 — polls every 100 ms) 
+void Task_Fingerprint(void *pvParameters) {
+    uint16_t id;
+    while (1) {
+        if (currentState == STATE_IDLE) {
+            id = getFingerprintID();
+            if (id != 0) {
+                xQueueSend(eventQueue, &id, portMAX_DELAY);
+                currentState = STATE_PROCESS;
+            }
+        }
+        vTaskDelay(100 / portTICK_PERIOD_MS);
+    }
+}
+ 
+// ── Task_FSM (Priority 3 — blocks on queue)
+void Task_FSM(void *pvParameters) {
+    uint16_t receivedID;
+    while (1) {
+        if (xQueueReceive(eventQueue, &receivedID, portMAX_DELAY)) {
+            int index = receivedID - 2008001;
+            if (index >= 0 && index < 10) {
+                users[index].status = !users[index].status;
+                lastID      = receivedID;
+                showUser    = true;
+                displayTimer = millis();
+ 
+                DateTime now = rtc.now();
+                Serial.print(receivedID);          Serial.print(",");
+                Serial.print(users[index].name);   Serial.print(",");
+                Serial.print(now.day());           Serial.print("/");
+                Serial.print(now.month());         Serial.print("/2026,Sunday,");
+                Serial.print(now.hour());          Serial.print(":");
+                Serial.print(now.minute());        Serial.print(":");
+                Serial.print(now.second());        Serial.print(",");
+                Serial.println(users[index].status ? "IN" : "OUT");
+            }
+            currentState = STATE_IDLE;
+        }
+    }
+}
+ 
+// ── Task_Display (Priority 1 — updates every 500 ms)
+void Task_Display(void *pvParameters) {
+    while (1) {
+        if (showUser && millis() - displayTimer < 3000) {
+            int index = lastID - 2008001;
+            lcd.clear();
+            lcd.setCursor(0, 0);  lcd.print(users[index].name);
+            lcd.setCursor(0, 1);  lcd.print("ID:");
+                                  lcd.print(lastID);
+        } else {
+            showUser = false;
+            DateTime now = rtc.now();
+            lcd.clear();
+            lcd.setCursor(0, 0);
+            lcd.print(now.day());   lcd.print("/");
+            lcd.print(now.month()); lcd.print("/2026");
+            lcd.setCursor(0, 1);
+            lcd.print(now.hour());   lcd.print(":");
+            lcd.print(now.minute()); lcd.print(":");
+            lcd.print(now.second());
+        }
+        vTaskDelay(500 / portTICK_PERIOD_MS);
+    }
+}
+ 
+// ── Fingerprint helper 
+int getFingerprintID() {
+    uint8_t p = finger.getImage();
+    if (p != FINGERPRINT_OK) return 0;
+    p = finger.fingerFastSearch();
+    if (p != FINGERPRINT_OK) return 0;
+    return finger.fingerID + 2008000;
+}
