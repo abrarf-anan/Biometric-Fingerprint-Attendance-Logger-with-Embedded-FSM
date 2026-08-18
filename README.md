@@ -21,10 +21,10 @@ The system uses a 7805 voltage regulator with 1 µF input/output decoupling capa
 
 | Component | Interface / Pins | Details |
 | :--- | :--- | :--- |
-| **Arduino Uno R3** | ATmega328P Main MCU | Controls peripheral interfacing, FSM logic, and FreeRTOS kernel[cite: 2, 3]. |
+| **Arduino Uno R3** | ATmega328P Main MCU | Controls peripheral interfacing, FSM logic, and FreeRTOS kernel. |
 | **R307 Fingerprint Sensor** | Hardware UART (Pins 0/1) or SoftwareSerial (Pins 2/3) @ 57600 bps | Captures fingerprint images and matches minutiae templates[cite: 2, 3]. |
-| **DS3231 / DS3338U-33 RTC** | I²C Bus (SDA -> A4, SCL -> A5) @ Address `0x68` | Stores calendar and clock registers with battery backup[cite: 2, 3]. |
-| **16×2 Character LCD** | 4-bit Parallel (D3–D7, D11–D13) or I²C (`0x27`) | Displays user check-in status and live RTC time feedback[cite: 2, 3]. |
+| **DS3231 / DS3338U-33 RTC** | I²C Bus (SDA -> A4, SCL -> A5) @ Address `0x68` | Stores calendar and clock registers with battery backup |
+| **16×2 Character LCD** | 4-bit Parallel (D3–D7, D11–D13) or I²C (`0x27`) | Displays user check-in status and live RTC time feedback |
 | **Power Regulation** | 12V DC Input -> 7805 Regulator | Provides clean +5V supply filtered by capacitors C1 and C2. |
 
 ---
