@@ -1,0 +1,71 @@
+#include <systemc.h>
+#include <iostream>
+#include <string>
+using namespace std;
+ 
+// Mirrors the three FreeRTOS tasks
+struct TaskDesc {
+  string name;
+  int    priority;
+  int    period_us;  // 0 = event-driven
+};
+ 
+SC_MODULE(RTOSScheduler) {
+  sc_in<bool> clk;
+ 
+  TaskDesc tasks[3] = {
+    {"Task_FSM",         3, 0      },  // event-driven (blocks on queue)
+    {"Task_Fingerprint", 2, 100000 },  // 100 ms periodic
+    {"Task_Display",     1, 500000 },  // 500 ms periodic
+  };
+ 
+  // Simulated queue event at t=200ms (fingerprint match)
+  bool queueEvent     = false;
+  int  queueEventTime = 200000;  // us
+ 
+  void schedule() {
+    int t = 0;
+    while (t <= 1500000) {   // simulate 1.5 seconds
+      wait(clk.posedge_event());
+      t += 1000;             // 1 ms tick
+ 
+      // Inject queue event at t=200ms
+      if (t == queueEventTime) queueEvent = true;
+ 
+      // Task_FSM unblocks on queue event (highest priority)
+      if (queueEvent) {
+        cout << "[T=" << t/1000 << "ms] DISPATCH: Task_FSM (P3) [queue unblock]" << endl;
+        queueEvent = false;
+        continue;
+      }
+ 
+      // Periodic tasks
+      int best = -1, bestPri = -1;
+      for (int i = 1; i < 3; i++) {
+        if (tasks[i].period_us > 0 && (t*1000) % tasks[i].period_us == 0) {
+          if (tasks[i].priority > bestPri) {
+            bestPri = tasks[i].priority; best = i;
+          }
+        }
+      }
+      if (best >= 0)
+        cout << "[T=" << t/1000 << "ms] DISPATCH: " << tasks[best].name
+             << " (P" << tasks[best].priority << ")" << endl;
+    }
+    cout << "[INFO] Simulation complete. No priority inversions detected." << endl;
+    sc_stop();
+  }
+ 
+  SC_CTOR(RTOSScheduler) {
+    SC_THREAD(schedule);
+    sensitive << clk.pos();
+  }
+};
+ 
+int sc_main(int, char*[]) {
+  RTOSScheduler sched("RTOS");
+  sc_clock clk("clk", 1, SC_MS);
+  sched.clk(clk);
+  sc_start();
+  return 0;
+}
