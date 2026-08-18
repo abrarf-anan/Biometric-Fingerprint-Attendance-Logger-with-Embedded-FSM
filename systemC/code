@@ -1,1 +1,77 @@
+#include <systemc.h>
+#include <systemc.h>
+#include <iostream>
+ 
+// FSM State Enumeration
+SC_MODULE(AttendanceFSM) {
+  // Ports
+  sc_in<bool>  clk;
+  sc_in<bool>  fp_match;       // 1 = fingerprint matched
+  sc_in<bool>  last_state_in;  // 1 = user was last IN
+  sc_out<sc_lv<3>> state_out;  // current FSM state
+  sc_out<bool> log_trigger;    // pulse to trigger serial log
+ 
+  // FSM State Encoding
+  enum State { IDLE=0, VERIFY=1, IN_ST=2, OUT_ST=3, LOG_ST=4 };
+  State current_state;
+ 
+  // Sequential Logic
+  void fsm_process() {
+    while(true) {
+      wait(); // wait for clock edge
+      log_trigger.write(false);
+      switch(current_state) {
+        case IDLE:
+          if(fp_match.read()) current_state = VERIFY;
+          break;
+        case VERIFY:
+          current_state = last_state_in.read() ? OUT_ST : IN_ST;
+          break;
+        case IN_ST:
+          cout << "[FSM] Status: CHECK-IN logged at T=" << sc_time_stamp() << endl;
+          current_state = LOG_ST;
+          break;
+        case OUT_ST:
+          cout << "[FSM] Status: CHECK-OUT logged at T=" << sc_time_stamp() << endl;
+          current_state = LOG_ST;
+          break;
+        case LOG_ST:
+          log_trigger.write(true);
+          current_state = IDLE;
+          break;
+      }
+      state_out.write(current_state);
+    }
+  }
+ 
+  SC_CTOR(AttendanceFSM) : current_state(IDLE) {
+    SC_THREAD(fsm_process);
+    sensitive << clk.pos();
+  }
+};
+ 
+int sc_main(int, char*[]) {
+  AttendanceFSM fsm("AttendanceFSM");
+  sc_clock clk("clk", 10, SC_NS);
+  sc_signal<bool>    fp_match, last_state_in, log_trig;
+  sc_signal<sc_lv<3>> state_sig;
+ 
+  fsm.clk(clk);
+  fsm.fp_match(fp_match);
+  fsm.last_state_in(last_state_in);
+  fsm.state_out(state_sig);
+  fsm.log_trigger(log_trig);
+ 
+  // Test Sequence
+  sc_start(10, SC_NS);  // IDLE
+  fp_match.write(true); last_state_in.write(false); // New user -> IN
+  sc_start(40, SC_NS);
+  fp_match.write(false);
+  sc_start(10, SC_NS);
+  fp_match.write(true); last_state_in.write(true);  // Same user -> OUT
+  sc_start(40, SC_NS);
+ 
+  cout << "Simulation Complete." << endl;
+  return 0;
+}
 
