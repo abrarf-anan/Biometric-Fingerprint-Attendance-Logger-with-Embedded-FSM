@@ -1,0 +1,36 @@
+#include <Arduino_FreeRTOS.h>
+#include <queue.h>
+#include <Wire.h>
+#include <LiquidCrystal_I2C.h>
+#include <RTClib.h>
+#include <Adafruit_Fingerprint.h>
+#include <SoftwareSerial.h>
+
+LiquidCrystal_I2C lcd(0x27, 16, 2);
+RTC_DS3231 rtc;
+SoftwareSerial mySerial(2, 3);
+Adafruit_Fingerprint finger = Adafruit_Fingerprint(&mySerial);
+
+typedef enum { STATE_IDLE, STATE_PROCESS } SystemState;
+volatile SystemState currentState = STATE_IDLE;
+
+QueueHandle_t eventQueue;
+
+void setup() {
+    Serial.begin(9600);
+    Wire.begin();
+    lcd.init();
+    lcd.backlight();
+    rtc.begin();
+    finger.begin(57600);
+
+    eventQueue = xQueueCreate(5, sizeof(uint16_t));
+
+    xTaskCreate(Task_Fingerprint, "FP",  128, NULL, 2, NULL);
+    xTaskCreate(Task_Display,     "LCD", 128, NULL, 1, NULL);
+    xTaskCreate(Task_FSM,         "FSM", 128, NULL, 3, NULL);
+
+    vTaskStartScheduler();
+}
+
+void loop() {}
